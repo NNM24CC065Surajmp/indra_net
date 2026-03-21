@@ -2,97 +2,332 @@ import streamlit as st
 import requests
 import time
 from datetime import datetime
+import math
 
 st.set_page_config(page_title="INDRA-NET", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom CSS for better styling
+# Advanced Custom CSS - Dark theme with neon effects
 st.markdown("""
     <style>
-    .metric-card {
-        background-color: #1e1e2e;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #ffd700;
+    @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+    
+    * {
+        font-family: 'Roboto', sans-serif;
     }
-    .safe-status {color: #00ff00;}
-    .caution-status {color: #ffd700;}
-    .critical-status {color: #ff4444;}
+    
+    /* Main background */
+    body, .main {
+        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1929 100%) !important;
+        color: #e4e6eb;
+    }
+    
+    /* Cards styling */
+    .metric-card {
+        background: linear-gradient(145deg, #1a2140 0%, #2a3f5f 100%);
+        border: 1px solid rgba(100, 200, 255, 0.2);
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 150, 255, 0.1);
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+    
+    .metric-card:hover {
+        border-color: rgba(100, 200, 255, 0.5);
+        box-shadow: 0 12px 48px rgba(0, 150, 255, 0.2);
+        transform: translateY(-2px);
+    }
+    
+    /* Title styling */
+    h1, h2, h3 {
+        font-family: 'Courier Prime', monospace;
+        font-weight: 700;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #00d4ff, #00ffaa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    h1 {
+        font-size: 3.5rem !important;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+    
+    h4 {
+        color: #00d4ff;
+        font-size: 1.1rem;
+        letter-spacing: 3px;
+    }
+    
+    /* Risk score display */
+    .risk-score {
+        font-family: 'Courier Prime', monospace;
+        font-size: 6rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #ff006e, #ffd60a, #00d4ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 30px rgba(255, 0, 110, 0.3);
+        letter-spacing: 4px;
+    }
+    
+    /* Alert status */
+    .alert-high {
+        color: #ff006e;
+        font-weight: 700;
+        font-size: 2rem;
+        letter-spacing: 2px;
+        text-shadow: 0 0 15px rgba(255, 0, 110, 0.5);
+    }
+    
+    .alert-medium {
+        color: #ffd60a;
+        font-weight: 700;
+        font-size: 2rem;
+        letter-spacing: 2px;
+        text-shadow: 0 0 15px rgba(255, 214, 10, 0.5);
+    }
+    
+    .alert-low {
+        color: #00d4ff;
+        font-weight: 700;
+        font-size: 2rem;
+        letter-spacing: 2px;
+        text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+    }
+    
+    /* Progress bar */
+    .progress-bar {
+        background: linear-gradient(90deg, #00d4ff, #00ffaa);
+        border-radius: 10px;
+        height: 8px;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+    }
+    
+    /* Zone container */
+    .zone-container {
+        background: linear-gradient(145deg, #1a2140 0%, #2a3f5f 100%);
+        border: 2px solid rgba(0, 212, 255, 0.3);
+        border-radius: 12px;
+        padding: 20px;
+        margin: 10px 0;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .zone-container:hover {
+        border-color: rgba(0, 212, 255, 0.7);
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    }
+    
+    /* Data display */
+    .data-label {
+        color: #00d4ff;
+        font-family: 'Courier Prime', monospace;
+        font-size: 1.3rem;
+        letter-spacing: 1px;
+        opacity: 0.8;
+    }
+    
+    .data-value {
+        color: #00ffaa;
+        font-family: 'Courier Prime', monospace;
+        font-size: 3rem;
+        font-weight: 700;
+        margin-top: 5px;
+    }
+    
+    /* Divider */
+    hr {
+        border: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+        margin: 30px 0;
+    }
+    
+    /* Selectbox styling */
+    .stSelectbox label {
+        color: #00d4ff !important;
+        font-weight: 600;
+        letter-spacing: 1px;
+    }
+    
+    /* Button styling */
+    .stButton button {
+        background: linear-gradient(90deg, #00d4ff, #00ffaa) !important;
+        color: #0a0e27 !important;
+        border: none !important;
+        font-weight: 700 !important;
+        letter-spacing: 1px !important;
+    }
+    
+    .stButton button:hover {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.5) !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
+# Main Title
 st.markdown("""
-    <h1 style='text-align: center'>INDRA-NET</h1>
-    <h4 style='text-align: center; color: #888;'>Command Dashboard</h4>
+    <div style='text-align: center; margin-bottom: 20px;'>
+        <h1>INDRA-NET</h1>
+        <h4>[ COMMAND DASHBOARD v1.0 ]</h4>
+        <p style='color: #00d4ff; font-family: Courier Prime; letter-spacing: 2px; margin-top: -10px;'>Real-time Crowd Monitoring System</p>
+    </div>
 """, unsafe_allow_html=True)
 
-# Location Selector
-st.subheader("Select Location")
-location_options = {
-    "Small Hall (50 m²)": 50,
-    "Auditorium (200 m²)": 200,
-    "Open Ground (500 m²)": 500
-}
-
-selected_location = st.selectbox(
-    "Choose location to monitor:",
-    list(location_options.keys()),
-    key="location_selector"
-)
+# Location Selector with styling
+col_loc1, col_loc2, col_loc3 = st.columns([1, 2, 1])
+with col_loc2:
+    st.markdown("<p style='color: #00d4ff; font-weight: 600; letter-spacing: 1px;'>SELECT LOCATION</p>", unsafe_allow_html=True)
+    location_options = {
+        "Small Hall (50 m²)": 50,
+        "Auditorium (200 m²)": 200,
+        "Open Ground (500 m²)": 500
+    }
+    selected_location = st.selectbox(
+        "Select Location",
+        list(location_options.keys()),
+        key="location_selector",
+        label_visibility="collapsed"
+    )
 
 selected_area = location_options[selected_location]
 
-# Header with location and time
-col_header1, col_header2, col_header3 = st.columns([2, 3, 1])
-with col_header1:
-    st.write(f"{selected_location}")
-with col_header3:
-    st.write(f"{datetime.now().strftime('%I:%M:%S %p')}")
+# Header info
+col_info1, col_info2, col_info3 = st.columns([1, 2, 1])
+with col_info1:
+    st.markdown(f"<p style='color: #00ffaa; font-family: Courier Prime; font-weight: 600;'>LOCATION: {selected_location}</p>", unsafe_allow_html=True)
+with col_info3:
+    st.markdown(f"<p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; text-align: right;'>TIME: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown("")
 
 try:
-    # Pass the area to the backend
     data = requests.get(f"http://127.0.0.1:5001/data?area={selected_area}", timeout=5).json()
 
-    # Top Section - 3 Columns with Metrics
-    col1, col2, col3 = st.columns(3)
+    # Top Layer Metrics
+    st.markdown("<p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; letter-spacing: 2px; margin-bottom: 15px;'>>> SENSOR LAYERS</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3, gap="medium")
+    
+    crowd = data.get("crowd_count", 0)
     
     with col1:
-        st.subheader("EDGE VISION LAYER")
-        st.metric("Crowd Count", 0, "Real-time")
+        st.markdown(f"""
+            <div class='metric-card'>
+                <p class='data-label'>EDGE VISION LAYER</p>
+                <p class='data-value'>{crowd}</p>
+                <p style='color: #888; font-size: 0.9rem;'>Total People Detected</p>
+            </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.subheader("WIRELESS DENSITY LAYER")
-        st.metric("Connected Devices", data.get("device_count", "N/A"), "Calculated by density")
+        device_count = data.get("device_count", 0)
+        st.markdown(f"""
+            <div class='metric-card'>
+                <p class='data-label'>WIRELESS DENSITY</p>
+                <p class='data-value'>{device_count}</p>
+                <p style='color: #888; font-size: 0.9rem;'>Devices Connected</p>
+            </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.subheader("MOTION INTELLIGENCE LAYER")
-        st.metric("Stability Score", f"{int(data.get('instability', 0) * 10)}/100", "Stable Movement")
-
-    st.markdown("---")
-
-    # Middle Section - Risk Score Display
-    col_left, col_center, col_right = st.columns([1, 2, 1])
-    
-    with col_center:
+        stability = int(data.get("instability", 0) * 10)
         st.markdown(f"""
-            <div style="text-align: center; padding: 20px;">
-                <h3 style="margin-bottom: 10px; font-weight: 600;">OVERALL RISK SCORE</h3>
-                <div style="font-size: 72px; color: #ffd700; font-weight: bold; line-height: 1;">
-                    {round(data.get("risk", 0) * 100)}
-                </div>
-                <div style="font-size: 22px; color: #ffd700; font-weight: 500; margin-top: 0px;">
-                    {data.get("alert", "UNKNOWN")}
-                </div>
+            <div class='metric-card'>
+                <p class='data-label'>MOTION INTELLIGENCE</p>
+                <p class='data-value'>{stability}/100</p>
+                <p style='color: #888; font-size: 0.9rem;'>Stability Score</p>
             </div>
         """, unsafe_allow_html=True)
 
+    st.markdown("")
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("")
+
+    # Risk Score - Main Display
+    risk_value = round(data.get("risk", 0) * 100)
+    alert_status = data.get("alert", "UNKNOWN")
+    
+    # Determine color based on alert
+    if alert_status == "HIGH":
+        alert_class = "alert-high"
+        risk_color = "#ff006e"
+    elif alert_status == "MEDIUM":
+        alert_class = "alert-medium"
+        risk_color = "#ffd60a"
+    else:
+        alert_class = "alert-low"
+        risk_color = "#00d4ff"
+    
+    st.markdown(f"""
+        <div style='text-align: center; padding: 40px 20px;'>
+            <p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; letter-spacing: 2px; font-size: 1.1rem;'>>>> OVERALL RISK ASSESSMENT <<<<</p>
+            <div class='risk-score' style='color: {risk_color};'>{risk_value}</div>
+            <div class='{alert_class}' style='margin-top: 15px;'>{alert_status} THREAT LEVEL</div>
+            <p style='color: #888; margin-top: 15px; font-size: 0.9rem;'>[ Risk Analysis Complete ]</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("")
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("")
+
+    # Live Metrics
+    st.markdown("<p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; letter-spacing: 2px; margin-bottom: 15px;'>>> LIVE METRICS</p>", unsafe_allow_html=True)
+    
+    metric_col1, metric_col2, metric_col3 = st.columns(3, gap="medium")
+    
+    crowd = data.get("crowd_count", 0)
+    devices = data.get("device_count", 0)
+    motion = round(data.get("instability", 0), 2)
+    
+    with metric_col1:
+        st.markdown(f"""
+            <div class='metric-card'>
+                <p class='data-label'>CROWD COUNT</p>
+                <p class='data-value'>{crowd}</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_col2:
+        st.markdown(f"""
+            <div class='metric-card'>
+                <p class='data-label'>DEVICE DENSITY</p>
+                <p class='data-value'>{devices}</p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_col3:
+        st.markdown(f"""
+            <div class='metric-card'>
+                <p class='data-label'>MOTION INDEX</p>
+                <p class='data-value'>{motion}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("")
+    st.markdown("<p style='color: #666; text-align: center; font-family: Courier Prime; font-size: 0.8rem; margin-top: 20px;'>[ System Status: ONLINE ] [ Data: LIVE ] [ Connection: STABLE ]</p>", unsafe_allow_html=True)
+
     # Auto-refresh
-    time.sleep(2)
+    time.sleep(0.1)
     st.rerun()
 
 except requests.exceptions.ConnectionError:
-    st.error("Cannot connect to backend at http://127.0.0.1:5001")
-    st.info("Make sure your Flask/backend server is running on port 5001")
+    st.markdown("""
+        <div style='text-align: center; padding: 40px; background: linear-gradient(145deg, #2a1f1f, #3a2f2f); border: 2px solid #ff006e; border-radius: 12px;'>
+            <p style='color: #ff006e; font-family: Courier Prime; font-weight: 600; font-size: 1.2rem;'>CONNECTION ERROR</p>
+            <p style='color: #ff6b9d;'>Cannot reach backend at http://127.0.0.1:5001</p>
+            <p style='color: #888; font-size: 0.9rem; margin-top: 15px;'>Ensure Flask server is running: <code style='background: #1a1a1a; padding: 5px 10px; border-radius: 5px;'>python backend.py</code></p>
+        </div>
+    """, unsafe_allow_html=True)
 except Exception as e:
-    st.error(f"Error: {str(e)}")
+    st.markdown(f"""
+        <div style='text-align: center; padding: 40px; background: linear-gradient(145deg, #2a1f1f, #3a2f2f); border: 2px solid #ff006e; border-radius: 12px;'>
+            <p style='color: #ff006e; font-family: Courier Prime; font-weight: 600; font-size: 1.2rem;'>SYSTEM ERROR</p>
+            <p style='color: #ff6b9d;'>{str(e)}</p>
+        </div>
+    """, unsafe_allow_html=True)

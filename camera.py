@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import cv2
 import numpy as np
 import time
@@ -127,12 +126,12 @@ if __name__ == '__main__':
     ip = get_ip()
     print("="*60)
     print("🚨 CROWD SAFETY CCTV SYSTEM STARTED 🚨")
-    print(f"-> 💻 Laptop CCTV Dashboard: http://localhost:5000  (or http://{ip}:5000)")
-    print(f"-> 📱 Connect Phones via:    http://{ip}:5000/phone")
+    print(f"-> 💻 Laptop CCTV Dashboard: http://localhost:5000  (or https://10.111.160.50:5000)")
+    print(f"-> 📱 Connect Phones via:    https://10.111.160.50:5000/phone")
     print("="*60)
     
-    # Run the Flask app on all interfaces inside home network
-    app.run(host="0.0.0.0", port=5000)
-=======
-python app.py
->>>>>>> 1f2743c6f8e37a359d54238a96d7bcf0bb1cb3d5
+    # Run the Flask app on all interfaces inside home network with adhoc SSL
+    app.run(host="0.0.0.0", port=5000, ssl_context='adhoc')
+#=======
+#python app.py
+#>>>>>>> 1f2743c6f8e37a359d54238a96d7bcf0bb1cb3d5

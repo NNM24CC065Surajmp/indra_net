@@ -1,10 +1,12 @@
 from flask import Flask, jsonify, request
 import random
 import math
+from phyphox import get_data as get_phyphox_data
 
 app = Flask(__name__)
 
 latest_device_count = 0  # Global variable to store device count from C# program
+current_crowd_count = 0  # Track actual camera detections (no fake data)
 
 # 🔁 Global variables for Phyphox data
 prev_mag = 0
@@ -91,7 +93,7 @@ def get_data():
     Accepts area parameter from frontend location selector
     Uses device_count from C# Bluetooth monitor
     """
-    global latest_device_count
+    global latest_device_count, current_crowd_count
     
     # Get area from query parameter (default to 200 m² if not provided)
     area = float(request.args.get('area', 200))
@@ -99,32 +101,34 @@ def get_data():
     # Use device count from C# program (updated via /update_devices endpoint)
     device_count = latest_device_count
     
-    # Generate crowd count based on location
-    crowd_count = random.randint(20, 100)
+    # Fetch real crowd count from camera.py edge vision pipeline
+    import requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    try:
+        cam_res = requests.get("https://127.0.0.1:5000/api/counts", verify=False, timeout=1)
+        crowd_count = cam_res.json().get("total", 0)
+        current_crowd_count = crowd_count # Synchronize state
+    except Exception as e:
+        # No random simulation. Just return the last known true count or 0.
+        crowd_count = current_crowd_count
     
     # Calculate crowd density per m²
     if area > 0:
         crowd_density = crowd_count / area
     else:
         crowd_density = 0
+
+    # --- PHYPHOX INTEGRATION ---
+    x, y, z = get_phyphox_data()
+    norm_instability = compute_motion_risk(x, y, z)
     
-    # Generate random instability
-    instability = random.uniform(1, 8)
-
-    # --- PHYPHOX INTEGRATION (Commented out until finished) ---
-    # x, y, z = get_phyphox_data()  # your function
-    # norm_instability = compute_motion_risk(x, y, z)
-    # risk, alert = calculate_risk(crowd_count, device_count, norm_instability)
+    risk, alert = calculate_risk(crowd_count, device_count, norm_instability)
+    
+    # Scale instability back up to 10 for the UI display
+    instability = norm_instability * 10
     # ----------------------------------------------------------
-
-    risk = 0.5*(crowd_count/100) + 0.3*(instability/10) + 0.2*(device_count/50)
-
-    if risk > 0.7:
-        alert = "HIGH"
-    elif risk > 0.4:
-        alert = "MEDIUM"
-    else:
-        alert = "LOW"
 
     return jsonify({
         "crowd_count": crowd_count,
