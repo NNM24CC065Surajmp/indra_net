@@ -1,0 +1,35 @@
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.exe
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.deps.json
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.runtimeconfig.json
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.pdb
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\Microsoft.Windows.SDK.NET.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\WinRT.Runtime.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.GeneratedMSBuildEditorConfig.editorconfig
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.AssemblyInfoInputs.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.AssemblyInfo.cs
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.csproj.CoreCompileInputs.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\Bluetoot.DB5C1DC6.Up2Date
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\refint\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.pdb
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.genruntimeconfig.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\ref\BluetoothWatcher.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.GeneratedMSBuildEditorConfig.editorconfig
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.AssemblyInfoInputs.cache
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.AssemblyInfo.cs
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.csproj.CoreCompileInputs.cache
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.sourcelink.json
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\refint\BluetoothWatcher.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.pdb
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.exe
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.deps.json
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.runtimeconfig.json
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.pdb
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\Microsoft.Windows.SDK.NET.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0-windows10.0.19041.0\WinRT.Runtime.dll
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\Bluetoot.DB5C1DC6.Up2Date
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\BluetoothWatcher.genruntimeconfig.cache
+D:\pampri_chinchad_pune\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0-windows10.0.19041.0\ref\BluetoothWatcher.dll

@@ -1,0 +1,14 @@
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0\BluetoothWatcher.exe
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0\BluetoothWatcher.deps.json
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0\BluetoothWatcher.runtimeconfig.json
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\bin\Debug\net8.0\BluetoothWatcher.pdb
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.GeneratedMSBuildEditorConfig.editorconfig
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.AssemblyInfoInputs.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.AssemblyInfo.cs
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.csproj.CoreCompileInputs.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\refint\BluetoothWatcher.dll
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.pdb
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\BluetoothWatcher.genruntimeconfig.cache
+D:\4th sem\pune_hackathon\BluetoothWatcher\obj\Debug\net8.0\ref\BluetoothWatcher.dll

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import cv2
 import numpy as np
 import time
@@ -132,3 +133,6 @@ if __name__ == '__main__':
     
     # Run the Flask app on all interfaces inside home network
     app.run(host="0.0.0.0", port=5000)
+=======
+python app.py
+>>>>>>> 1f2743c6f8e37a359d54238a96d7bcf0bb1cb3d5
