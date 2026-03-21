@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Camera Node</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; max-width: 500px; margin: 0 auto; padding: 20px; background-color: #222; color: #fff; }
+        .input-group { margin: 20px 0; }
+        input { padding: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; width: 60%; text-align: center; }
+        button { padding: 12px 24px; font-size: 18px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: 0.3s; margin-top:20px;}
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        .video-container { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 20px; background-color: #000; margin-top:20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);}
+        video { width: 100%; height: auto; display: block; }
+        #status { font-weight: bold; margin-top: 15px; color: #ffeb3b; }
+        .recording-indicator { display: none; color: #ff3b3b; font-weight: bold; animation: blink 1s infinite; margin-top: 15px;}
+        .card { background-color: #333; padding: 20px; border-radius: 12px; }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📱 Camera Node</h1>
+        <p>Turn this phone into a CCTV camera.</p>
+
+        <div class="input-group">
+            <label for="cam_id" style="font-weight: bold; display: block; margin-bottom: 10px;">Give this camera a name:</label>
+            <input type="text" id="cam_id" placeholder="e.g. Entrance, Gate 1">
+        </div>
+
+        <button id="startBtn">Start Streaming CCTV</button>
+        <div id="recording" class="recording-indicator">🔴 LIVE STREAMING TO LAPTOP...</div>
+
+        <div class="video-container">
+            <!-- The video is displayed here -->
+            <video id="video" autoplay playsinline muted></video>
+        </div>
+        
+        <div id="status">Waiting to start...</div>
+    </div>
+
+    <!-- Hidden canvas for capturing frames -->
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const startBtn = document.getElementById("startBtn");
+        const statusEl = document.getElementById("status");
+        const camIdInput = document.getElementById("cam_id");
+        const recordingMarker = document.getElementById("recording");
+
+        let streamingInterval = null;
+
+        // Auto-generate a random camera name if empty
+        camIdInput.value = "Cam_" + Math.floor(Math.random() * 1000);
+
+        startBtn.onclick = async () => {
+            const camId = camIdInput.value.trim() || "Unknown_Cam";
+            startBtn.disabled = true;
+            statusEl.innerText = "Requesting Camera Access...";
+            statusEl.style.color = "#ffeb3b";
+
+            try {
+                // Request back camera
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }, 
+                    audio: false 
+                });
+                
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    statusEl.innerText = "Camera Active. Transmitting to Laptop Server...";
+                    statusEl.style.color = "#4CAF50";
+                    recordingMarker.style.display = "block";
+
+                    // Start sending frames (2 frames per second to save network and laptop CPU)
+                    streamingInterval = setInterval(() => sendFrame(camId), 500); 
+                };
+
+            } catch (err) {
+                alert("Camera access denied! Please allow camera access in your mobile browser settings.");
+                console.error(err);
+                startBtn.disabled = false;
+                statusEl.innerText = "Error: Camera Access Denied.";
+                statusEl.style.color = "#ff3b3b";
+            }
+        };
+
+        async function sendFrame(camId) {
+            if (video.videoWidth === 0) return; // not ready
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append("frame", blob);
+                
+                try {
+                    // Send to the laptop flask server
+                    // The phone uses its current host window location
+                    await fetch("/upload", {
+                        method: "POST",
+                        body: formData,
+                        headers: {
+                            "Camera-ID": camId
+                        }
+                    });
+                } catch (e) {
+                    console.log("Error sending frame:", e);
+                    statusEl.innerText = "Connection lost. Ensure you are on the same WiFi as the laptop.";
+                    statusEl.style.color = "#ff3b3b";
+                }
+            }, "image/jpeg", 0.6); // Compress to 60% quality logic to save bandwidth and boost FPS
+        }
+    </script>
+</body>
+</html>

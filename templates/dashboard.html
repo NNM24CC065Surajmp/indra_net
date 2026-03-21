@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laptop CCTV Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: #fff; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .total-count { font-size: 3em; color: #ffeb3b; font-weight: bold; }
+        .camera-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .camera-card { background-color: #333; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .camera-header { background-color: #222; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .cam-name { font-size: 1.2em; font-weight: bold; }
+        .cam-count { background-color: #ff3b3b; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
+        .video-container { width: 100%; height: 350px; background-color: #000; display: flex; align-items: center; justify-content: center; overflow: hidden;}
+        img.cctv-feed { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .no-cameras { text-align: center; color: #888; font-size: 1.2em; grid-column: 1 / -1; margin-top: 50px; }
+        .header-title { font-size: 2.5em; margin-bottom: 10px; font-weight: 300; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-title">🛡️ Crowd Safety Central CCTV</div>
+        <div>Total People Detected System-Wide: <br><span id="total-count" class="total-count">0</span></div>
+    </div>
+
+    <div id="camera-grid" class="camera-grid">
+        <div class="no-cameras" id="no-cams-msg">Waiting for phone cameras to connect...<br><br>Please open the phone app endpoint on your mobile browser over the same WiFi.</div>
+    </div>
+
+    <script>
+        const cameraGrid = document.getElementById('camera-grid');
+        const totalCountEl = document.getElementById('total-count');
+        const noCamsMsg = document.getElementById('no-cams-msg');
+        
+        // Track rendered cameras so we don't recreate them every second
+        let renderedCams = new Set();
+
+        async function updateCounts() {
+            try {
+                const response = await fetch('/api/counts');
+                const data = await response.json();
+                
+                // Update total count
+                totalCountEl.innerText = data.total;
+                
+                const activeCams = Object.keys(data.cameras);
+                
+                if (activeCams.length > 0) {
+                    if (noCamsMsg) noCamsMsg.style.display = 'none';
+                } else {
+                    if (noCamsMsg) noCamsMsg.style.display = 'block';
+                }
+                
+                // Remove disconnected cameras from UI
+                for (let camId of renderedCams) {
+                    if (!activeCams.includes(camId)) {
+                        const card = document.getElementById(`card-${camId}`);
+                        if (card) card.remove();
+                        renderedCams.delete(camId);
+                    }
+                }
+                
+                // Add new cameras or update existing
+                for (let [camId, count] of Object.entries(data.cameras)) {
+                    if (!renderedCams.has(camId)) {
+                        // Create new camera card
+                        const card = document.createElement('div');
+                        card.className = 'camera-card';
+                        card.id = `card-${camId}`;
+                        
+                        card.innerHTML = `
+                            <div class="camera-header">
+                                <span class="cam-name">📹 ${camId}</span>
+                                <span class="cam-count" id="count-${camId}">${count} People</span>
+                            </div>
+                            <div class="video-container">
+                                <!-- MJPEG Stream -->
+                                <img class="cctv-feed" src="/video/${camId}" alt="${camId} feed">
+                            </div>
+                        `;
+                        cameraGrid.appendChild(card);
+                        renderedCams.add(camId);
+                    } else {
+                        // Just update the count text
+                        document.getElementById(`count-${camId}`).innerText = `${count} People`;
+                    }
+                }
+                
+            } catch (error) {
+                console.error("Error fetching counts:", error);
+            }
+        }
+
+        // Poll API every 1 second
+        setInterval(updateCounts, 1000);
+        updateCounts(); // Initial fetch
+    </script>
+</body>
+</html>
