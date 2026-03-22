@@ -7,7 +7,7 @@ import winsound  # Built into Windows — no install needed
 # ─────────────────────────────────────
 BACKEND_URL  = "http://127.0.0.1:5001/data"
 NTFY_CHANNEL = "revision-alerts"
-SUSTAIN_SECS = 3
+SUSTAIN_SECS = 0
 
 # ─────────────────────────────────────
 # STATE
@@ -71,13 +71,11 @@ def fire_alarm(alert_level, risk_score):
     risk_percent = round(risk_score * 100)
 
     if alert_level == "LOW":
-        # Single soft beep — all clear
-        winsound.Beep(1000, 600)
-        send_phone_notification("LOW", risk_score)
+        # Do nothing when threat level is low (no sound or notifications)
         print("=" * 50)
         print("✅  ALL CLEAR")
         print(f"    Risk   : {risk_percent}%")
-        print(f"    Notify : Coordinators only")
+        print(f"    Status : Threat level is low, no action taken")
         print("=" * 50)
 
     elif alert_level == "MEDIUM":
@@ -93,10 +91,10 @@ def fire_alarm(alert_level, risk_score):
         print("=" * 50)
 
     elif alert_level == "HIGH":
-        # Fast alternating siren — emergency
-        for _ in range(10):
-            winsound.Beep(2000, 150)
-            winsound.Beep(800,  150)
+        # Quick beeping siren — emergency
+        for _ in range(15):
+            winsound.Beep(2500, 100)
+            time.sleep(0.05)
         send_phone_notification("HIGH", risk_score)
         print("*" * 50)
         print("🔴  EMERGENCY ALERT")
@@ -139,7 +137,7 @@ def run():
                       f"waiting {SUSTAIN_SECS}s...")
 
             # Sustained long enough — fire alarm
-            elif level_start is not None:
+            if level_start is not None:
                 held = time.time() - level_start
                 if (held >= SUSTAIN_SECS and
                         alert_level != last_alerted):
@@ -152,7 +150,7 @@ def run():
         except Exception as e:
             print(f"❌  Error: {e}")
 
-        time.sleep(2)
+        time.sleep(0.01)
 
 
 if __name__ == "__main__":

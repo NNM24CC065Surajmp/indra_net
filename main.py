@@ -65,12 +65,8 @@ st.markdown("""
         font-family: 'Courier Prime', monospace;
         font-size: 6rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #ff006e, #ffd60a, #00d4ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        text-shadow: 0 0 30px rgba(255, 0, 110, 0.3);
         letter-spacing: 4px;
+        transition: color 0.3s, text-shadow 0.3s;
     }
     
     /* Alert status */
@@ -255,18 +251,18 @@ try:
     # Determine color based on alert
     if alert_status == "HIGH":
         alert_class = "alert-high"
-        risk_color = "#ff006e"
+        risk_color = "#ff0000"
     elif alert_status == "MEDIUM":
         alert_class = "alert-medium"
         risk_color = "#ffd60a"
     else:
         alert_class = "alert-low"
-        risk_color = "#00d4ff"
+        risk_color = "#00ff00"
     
     st.markdown(f"""
         <div style='text-align: center; padding: 40px 20px;'>
             <p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; letter-spacing: 2px; font-size: 1.1rem;'>>>> OVERALL RISK ASSESSMENT <<<<</p>
-            <div class='risk-score' style='color: {risk_color};'>{risk_value}</div>
+            <div class='risk-score' style='color: {risk_color}; text-shadow: 0 0 30px {risk_color}80;'>{risk_value}</div>
             <div class='{alert_class}' style='margin-top: 15px;'>{alert_status} THREAT LEVEL</div>
             <p style='color: #888; margin-top: 15px; font-size: 0.9rem;'>[ Risk Analysis Complete ]</p>
         </div>

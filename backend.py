@@ -53,9 +53,11 @@ def calculate_risk(crowd_count, device_count, norm_instability):
         0.2 * norm_instability
     )
 
-    # Optional spike boost (for demo impact)
-    if norm_instability > 0.8:
-        risk += 0.2
+    # Optional spike boost (for demo impact with 1 phone)
+    if norm_instability > 0.4:
+        risk += 0.3  # Helps push into MEDIUM
+    if norm_instability > 0.7:
+        risk += 0.6  # Forces directly into HIGH
 
     # Alert levels
     if risk > 0.7:
@@ -107,7 +109,7 @@ def get_data():
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
     try:
-        cam_res = requests.get("https://127.0.0.1:5000/api/counts", verify=False, timeout=1)
+        cam_res = requests.get("https://127.0.0.1:5000/api/counts", verify=False, timeout=0.05)
         crowd_count = cam_res.json().get("total", 0)
         current_crowd_count = crowd_count # Synchronize state
     except Exception as e:
