@@ -1,0 +1,40 @@
+cat > .gitignore <<EOF
+# Ignore build results
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+
+# Debug/Release outputs
+*.dll
+*.exe
+*.pdb
+*.cache
+*.log
+
+# Visual Studio files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet packages
+*.nupkg
+packages/
+
+# Other generated files
+*.sourcelink.json
+*.AssemblyInfoInputs.cache
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Ignore build outputs
+pune_hackathon/BluetoothWatcher/bin/
+pune_hackathon/BluetoothWatcher/obj/
+
+.vscode/
+__pycache__/
+EOF
