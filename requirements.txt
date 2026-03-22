@@ -1,0 +1,6 @@
+flask
+requests
+streamlit
+opencv-python
+numpy
+ultralytics
