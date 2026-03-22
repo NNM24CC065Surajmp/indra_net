@@ -1,7 +1,5 @@
 import requests
 import time
-import winsound  # Built into Windows — no install needed
-
 # ─────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────
@@ -79,9 +77,7 @@ def fire_alarm(alert_level, risk_score):
         print("=" * 50)
 
     elif alert_level == "MEDIUM":
-        # 6 fast beeps — caution
-        for _ in range(6):
-            winsound.Beep(1500, 150)
+        # Dispersal CAUTION. (No buzzer, audio reserved for alert.mp3 in HIGH)
         send_phone_notification("MEDIUM", risk_score)
         print("=" * 50)
         print("🟡  CAUTION ALERT")
@@ -91,10 +87,25 @@ def fire_alarm(alert_level, risk_score):
         print("=" * 50)
 
     elif alert_level == "HIGH":
-        # Quick beeping siren — emergency
-        for _ in range(15):
-            winsound.Beep(2500, 100)
-            time.sleep(0.05)
+        # Play mp3 siren — emergency
+        try:
+            import pygame
+            import os
+            
+            # Suppress the pygame welcome text
+            os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+            
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.music.load("alert.mp3")
+            pygame.mixer.music.play()
+            # Wait until the MP3 finishes playing so it matches the previous blocking behavior
+            while pygame.mixer.music.get_busy():
+                import time
+                time.sleep(0.1)
+        except ImportError:
+            # Fallback if pygame is not installed
+            print("🔊 Pygame is missing! No audio will play because winsound beeps have been removed.")
         send_phone_notification("HIGH", risk_score)
         print("*" * 50)
         print("🔴  EMERGENCY ALERT")
