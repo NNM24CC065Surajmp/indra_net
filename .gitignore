@@ -38,3 +38,7 @@ pune_hackathon/BluetoothWatcher/obj/
 .vscode/
 __pycache__/
 EOF
+
+.venv/
+__pycache__/
+*.pyc

@@ -1,20 +1,57 @@
 from flask import Flask, jsonify, request
-import random
+import json
 import math
+import ssl
+import threading
+import time
+import urllib.request
+
+try:
+    import requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except ImportError:
+    requests = None
+
+import phyphox
 from phyphox import get_data as get_phyphox_data
 
 app = Flask(__name__)
 
-latest_device_count = 0  # Global variable to store device count from C# program
-current_crowd_count = 0  # Track actual camera detections (no fake data)
+CAMERA_COUNTS_URL = "https://127.0.0.1:5000/api/counts"
+CAMERA_POLL_INTERVAL = 1.0
+CAMERA_TIMEOUT = 1.0
+MOTION_POLL_INTERVAL = 0.2
 
-# 🔁 Global variables for Phyphox data
+_devices_lock = threading.Lock()
+_camera_lock = threading.Lock()
+_motion_lock = threading.Lock()
+_worker_lock = threading.Lock()
+
+latest_device_count = 0  # Global variable to store device count from C# program
+
+# Cached camera count state updated by background thread
+current_crowd_count = 0
+camera_last_updated = None
+camera_stale = True
+
+# Cached Phyphox motion state updated by background thread
 prev_mag = 0
 history = []
+latest_norm_instability = 0.0
+motion_last_updated = None
+motion_stale = True
+
+_stop_event = threading.Event()
+_camera_thread = None
+_motion_thread = None
+_camera_session = requests.Session() if requests is not None else None
+
 
 # 🔹 Step 1: Magnitude
 def magnitude(x, y, z):
-    return math.sqrt(x*x + y*y + z*z)
+    return math.sqrt(x * x + y * y + z * z)
+
 
 # 🔹 Step 2: Variation (change over time)
 def get_variation(x, y, z):
@@ -23,6 +60,7 @@ def get_variation(x, y, z):
     variation = abs(curr_mag - prev_mag)
     prev_mag = curr_mag
     return variation
+
 
 # 🔹 Step 3: Smoothing (moving average)
 def get_instability(variation):
@@ -34,9 +72,11 @@ def get_instability(variation):
 
     return sum(history) / len(history) if len(history) > 0 else 0
 
+
 # 🔹 Step 4: Normalize (0 to 1)
 def normalize_instability(instability):
     return min(instability / 5, 1)   # adjust 5 based on testing
+
 
 # 🔹 Final function to call in your backend
 def compute_motion_risk(x, y, z):
@@ -44,6 +84,7 @@ def compute_motion_risk(x, y, z):
     instability_val = get_instability(variation)
     norm_instability = normalize_instability(instability_val)
     return norm_instability
+
 
 # 🔹 Final risk formula (use inside your /data API)
 def calculate_risk(crowd_count, device_count, norm_instability):
@@ -69,9 +110,128 @@ def calculate_risk(crowd_count, device_count, norm_instability):
 
     return round(min(risk, 1), 2), alert
 
+
+def _fetch_camera_counts():
+    """Fetch camera JSON payload from the local edge vision service."""
+    if requests is not None:
+        session = _camera_session or requests
+        cam_res = session.get(CAMERA_COUNTS_URL, verify=False, timeout=CAMERA_TIMEOUT)
+        cam_res.raise_for_status()
+        return cam_res.json()
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    with urllib.request.urlopen(CAMERA_COUNTS_URL, timeout=CAMERA_TIMEOUT, context=ctx) as res:
+        return json.loads(res.read().decode("utf-8"))
+
+
+def _read_phyphox_sample():
+    """Read (x, y, z) from Phyphox, raising if Phyphox is offline."""
+    # Respect tests or callers that monkeypatch backend.get_phyphox_data directly.
+    if get_phyphox_data is not phyphox.get_data:
+        return get_phyphox_data()
+    return phyphox.fetch_data()
+
+
+def refresh_camera_count():
+    """Poll the camera service once and update the cached count and timestamp."""
+    global current_crowd_count, camera_last_updated, camera_stale
+    try:
+        payload = _fetch_camera_counts()
+        crowd_count = payload.get("total", 0)
+        now = time.time()
+        with _camera_lock:
+            current_crowd_count = crowd_count
+            camera_last_updated = now
+            camera_stale = False
+        return crowd_count
+    except Exception:
+        with _camera_lock:
+            camera_stale = True
+            return current_crowd_count
+
+
+def refresh_motion_state():
+    """Poll Phyphox once and update smoothed motion instability, or mark stale if offline."""
+    global latest_norm_instability, motion_last_updated, motion_stale
+    try:
+        sample = _read_phyphox_sample()
+        if sample is None:
+            raise ValueError("Phyphox returned no sample")
+        x, y, z = sample
+        with _motion_lock:
+            norm_instability = compute_motion_risk(x, y, z)
+            latest_norm_instability = norm_instability
+            motion_last_updated = time.time()
+            motion_stale = False
+        return norm_instability
+    except Exception:
+        with _motion_lock:
+            motion_stale = True
+            return latest_norm_instability
+
+
+def _poll_loop(fn, interval, stop_event):
+    """Run a polling callback at a fixed interval until stop_event is set."""
+    while not stop_event.is_set():
+        fn()
+        if stop_event.wait(interval):
+            break
+
+
+def start_background_workers():
+    """Start daemon threads for camera count and Phyphox motion polling if not running."""
+    global _camera_thread, _motion_thread
+    with _worker_lock:
+        if _stop_event.is_set():
+            _stop_event.clear()
+
+        if _camera_thread is None or not _camera_thread.is_alive():
+            _camera_thread = threading.Thread(
+                target=_poll_loop,
+                args=(refresh_camera_count, CAMERA_POLL_INTERVAL, _stop_event),
+                name="camera-poller",
+                daemon=True,
+            )
+            _camera_thread.start()
+
+        if _motion_thread is None or not _motion_thread.is_alive():
+            _motion_thread = threading.Thread(
+                target=_poll_loop,
+                args=(refresh_motion_state, MOTION_POLL_INTERVAL, _stop_event),
+                name="motion-poller",
+                daemon=True,
+            )
+            _motion_thread.start()
+
+
+def stop_background_workers(timeout=2.0):
+    """Signal background polling threads to stop and wait briefly for exit."""
+    global _camera_thread, _motion_thread
+    with _worker_lock:
+        _stop_event.set()
+        cam_t = _camera_thread
+        mot_t = _motion_thread
+        _camera_thread = None
+        _motion_thread = None
+
+    if cam_t is not None and cam_t.is_alive():
+        cam_t.join(timeout=timeout)
+    if mot_t is not None and mot_t.is_alive():
+        mot_t.join(timeout=timeout)
+
+
+@app.before_request
+def _ensure_workers():
+    if not app.config.get("TESTING", False):
+        start_background_workers()
+
+
 @app.route('/')
 def home():
     return "Backend running!"
+
 
 @app.route('/update_devices', methods=['POST'])
 def update_devices():
@@ -82,55 +242,43 @@ def update_devices():
     global latest_device_count
     try:
         data = request.json
-        latest_device_count = data.get("device_count", 0)
-        print(f"Updated device count: {latest_device_count}")
-        return jsonify({"status": "ok", "received_device_count": latest_device_count})
+        received = data.get("device_count", 0)
+        with _devices_lock:
+            latest_device_count = received
+        print(f"Updated device count: {received}")
+        return jsonify({"status": "ok", "received_device_count": received})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
 
 @app.route('/data')
 def get_data():
     """
     Returns data for Streamlit frontend
     Accepts area parameter from frontend location selector
-    Uses device_count from C# Bluetooth monitor
+    Uses device_count from C# Bluetooth monitor and cached camera/motion state
     """
-    global latest_device_count, current_crowd_count
-    
-    # Get area from query parameter (default to 200 m² if not provided)
     area = float(request.args.get('area', 200))
-    
-    # Use device count from C# program (updated via /update_devices endpoint)
-    device_count = latest_device_count
-    
-    # Fetch real crowd count from camera.py edge vision pipeline
-    import requests
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    
-    try:
-        cam_res = requests.get("https://127.0.0.1:5000/api/counts", verify=False, timeout=0.05)
-        crowd_count = cam_res.json().get("total", 0)
-        current_crowd_count = crowd_count # Synchronize state
-    except Exception as e:
-        # No random simulation. Just return the last known true count or 0.
-        crowd_count = current_crowd_count
-    
-    # Calculate crowd density per m²
-    if area > 0:
-        crowd_density = crowd_count / area
-    else:
-        crowd_density = 0
 
-    # --- PHYPHOX INTEGRATION ---
-    x, y, z = get_phyphox_data()
-    norm_instability = compute_motion_risk(x, y, z)
-    
+    with _devices_lock:
+        device_count = latest_device_count
+
+    with _camera_lock:
+        crowd_count = current_crowd_count
+        cam_updated_at = camera_last_updated
+        cam_is_stale = camera_stale
+
+    with _motion_lock:
+        norm_instability = latest_norm_instability
+        mot_updated_at = motion_last_updated
+        mot_is_stale = motion_stale
+
+    crowd_density = crowd_count / area if area > 0 else 0
+
     risk, alert = calculate_risk(crowd_count, device_count, norm_instability)
-    
+
     # Scale instability back up to 10 for the UI display
     instability = norm_instability * 10
-    # ----------------------------------------------------------
 
     return jsonify({
         "crowd_count": crowd_count,
@@ -139,11 +287,17 @@ def get_data():
         "area": area,
         "instability": round(instability, 2),
         "risk": round(risk, 2),
-        "alert": alert
+        "alert": alert,
+        "camera_updated_at": cam_updated_at,
+        "camera_stale": cam_is_stale,
+        "motion_updated_at": mot_updated_at,
+        "motion_stale": mot_is_stale,
     })
+
 
 # 🚨 VERY IMPORTANT
 if __name__ == '__main__':
     print("Starting Flask server on http://127.0.0.1:5001")
     print("C# program should POST to: http://127.0.0.1:5001/update_devices")
+    start_background_workers()
     app.run(host="127.0.0.1", port=5001, debug=False, use_reloader=False)
