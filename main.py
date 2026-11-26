@@ -1,4 +1,6 @@
 from datetime import datetime
+import json
+from pathlib import Path
 import time
 
 try:
@@ -10,6 +12,20 @@ try:
     import streamlit as st
 except ImportError:
     st = None
+
+CONFIG_PATH = Path(__file__).parent / "config" / "event_profiles.json"
+
+
+def load_event_profiles():
+    """Load event profiles from config/event_profiles.json."""
+    try:
+        if CONFIG_PATH.exists():
+            return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {
+        "default": {"label": "Default (current model)"}
+    }
 
 
 def compute_stability_score(instability):
@@ -195,9 +211,9 @@ def render_dashboard():
         </div>
     """, unsafe_allow_html=True)
 
-    # Location Selector with styling
-    col_loc1, col_loc2, col_loc3 = st.columns([1, 2, 1])
-    with col_loc2:
+    # Location & Event Type Selectors with styling
+    col_sel1, col_sel2 = st.columns(2)
+    with col_sel1:
         st.markdown("<p style='color: #00d4ff; font-weight: 600; letter-spacing: 1px;'>SELECT LOCATION</p>", unsafe_allow_html=True)
         location_options = {
             "Small Hall (50 m²)": 50,
@@ -210,13 +226,47 @@ def render_dashboard():
             key="location_selector",
             label_visibility="collapsed"
         )
-
     selected_area = location_options[selected_location]
 
+    with col_sel2:
+        st.markdown("<p style='color: #00d4ff; font-weight: 600; letter-spacing: 1px;'>SELECT EVENT TYPE</p>", unsafe_allow_html=True)
+        event_profiles = load_event_profiles()
+        profile_keys = list(event_profiles.keys())
+        label_to_key = {event_profiles[k].get("label", k): k for k in profile_keys}
+        labels = list(label_to_key.keys())
+        selected_label = st.selectbox(
+            "Select Event Type",
+            labels,
+            key="event_type_selector",
+            label_visibility="collapsed"
+        )
+        selected_profile_key = label_to_key.get(selected_label, "default")
+
+    # Synchronize selected event profile with backend
+    if requests is not None:
+        session_state = getattr(st, "session_state", None)
+        should_send = True
+        if session_state is not None:
+            if session_state.get("active_profile") == selected_profile_key:
+                should_send = False
+            else:
+                session_state["active_profile"] = selected_profile_key
+        if should_send:
+            try:
+                requests.post(
+                    "http://127.0.0.1:5001/set_event",
+                    json={"profile": selected_profile_key},
+                    timeout=2
+                )
+            except Exception:
+                pass
+
     # Header info
-    col_info1, col_info2, col_info3 = st.columns([1, 2, 1])
+    col_info1, col_info2, col_info3 = st.columns([1, 1, 1])
     with col_info1:
         st.markdown(f"<p style='color: #00ffaa; font-family: Courier Prime; font-weight: 600;'>LOCATION: {selected_location}</p>", unsafe_allow_html=True)
+    with col_info2:
+        st.markdown(f"<p style='color: #00ffaa; font-family: Courier Prime; font-weight: 600; text-align: center;'>EVENT: {selected_label}</p>", unsafe_allow_html=True)
     with col_info3:
         st.markdown(f"<p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; text-align: right;'>TIME: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
 
@@ -272,6 +322,12 @@ def render_dashboard():
         # Risk Score - Main Display
         risk_value = round(data.get("risk", 0) * 100)
         alert_status = data.get("alert", "UNKNOWN")
+        active_profile_label = data.get("profile_label") or data.get("profile") or selected_label
+        advice_text = data.get("advice", "")
+        advice_html = (
+            f"<p style='color: #e4e6eb; margin-top: 10px; font-size: 1.05rem; font-style: italic;'>&ldquo;{advice_text}&rdquo;</p>"
+            if advice_text else ""
+        )
         
         # Determine color based on alert
         if alert_status == "HIGH":
@@ -289,6 +345,8 @@ def render_dashboard():
                 <p style='color: #00d4ff; font-family: Courier Prime; font-weight: 600; letter-spacing: 2px; font-size: 1.1rem;'>>>> OVERALL RISK ASSESSMENT <<<<</p>
                 <div class='risk-score' style='color: {risk_color}; text-shadow: 0 0 30px {risk_color}80;'>{risk_value}</div>
                 <div class='{alert_class}' style='margin-top: 15px;'>{alert_status} THREAT LEVEL</div>
+                <p style='color: #00ffaa; font-family: Courier Prime; font-weight: 600; margin-top: 12px; letter-spacing: 1px;'>EVENT PROFILE: {active_profile_label.upper()}</p>
+                {advice_html}
                 <p style='color: #888; margin-top: 15px; font-size: 0.9rem;'>[ Risk Analysis Complete ]</p>
             </div>
         """, unsafe_allow_html=True)

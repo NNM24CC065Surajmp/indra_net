@@ -1,0 +1,47 @@
+{
+  "default": {
+    "label": "Default (current model)",
+    "weights": {"V": 0.50, "W": 0.30, "M": 0.20}, "yellow": 40, "red": 70,
+    "motion_spikes": [
+      {"threshold": 0.4, "boost": 0.3},
+      {"threshold": 0.7, "boost": 0.6}
+    ],
+    "advice": {"Green": "Normal monitoring.", "Yellow": "Increase attention on this zone.", "Red": "Alert control room and start crowd diversion."}
+  },
+  "procession_rally": {
+    "label": "Procession or rally",
+    "weights": {"V": 0.30, "W": 0.25, "M": 0.45}, "yellow": 35, "red": 65,
+    "motion_spikes": [
+      {"threshold": 0.4, "boost": 0.3},
+      {"threshold": 0.7, "boost": 0.6}
+    ],
+    "advice": {"Green": "Keep routes clear.", "Yellow": "Staff the choke points and slow the front of the crowd.", "Red": "Stop forward movement, open side routes, alert police."}
+  },
+  "standing_gathering": {
+    "label": "Standing gathering",
+    "weights": {"V": 0.45, "W": 0.35, "M": 0.20}, "yellow": 40, "red": 70,
+    "motion_spikes": [
+      {"threshold": 0.4, "boost": 0.3},
+      {"threshold": 0.7, "boost": 0.6}
+    ],
+    "advice": {"Green": "Normal monitoring.", "Yellow": "Pause new entry to this zone.", "Red": "Stop entry, open extra exits, guide people to low-density areas."}
+  },
+  "seated_audience": {
+    "label": "Seated audience",
+    "weights": {"V": 0.50, "W": 0.30, "M": 0.20}, "yellow": 45, "red": 75,
+    "motion_spikes": [
+      {"threshold": 0.4, "boost": 0.3},
+      {"threshold": 0.7, "boost": 0.6}
+    ],
+    "advice": {"Green": "Normal monitoring.", "Yellow": "Watch the gates and aisles.", "Red": "Stagger exit, open all exits, announce calmly."}
+  },
+  "queue_entry": {
+    "label": "Queue or entry gate",
+    "weights": {"V": 0.40, "W": 0.35, "M": 0.25}, "yellow": 40, "red": 70,
+    "motion_spikes": [
+      {"threshold": 0.4, "boost": 0.3},
+      {"threshold": 0.7, "boost": 0.6}
+    ],
+    "advice": {"Green": "Normal monitoring.", "Yellow": "Meter admission at the gate.", "Red": "Stop admission and widen or split the queue."}
+  }
+}

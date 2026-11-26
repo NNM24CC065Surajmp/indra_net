@@ -15,6 +15,7 @@ except ImportError:
 
 import phyphox
 from phyphox import get_data as get_phyphox_data
+import risk_engine
 
 app = Flask(__name__)
 
@@ -23,10 +24,20 @@ CAMERA_POLL_INTERVAL = 1.0
 CAMERA_TIMEOUT = 1.0
 MOTION_POLL_INTERVAL = 0.2
 
+LEVEL_TO_ALERT = {
+    "Green": "LOW",
+    "Yellow": "MEDIUM",
+    "Red": "HIGH"
+}
+
 _devices_lock = threading.Lock()
 _camera_lock = threading.Lock()
 _motion_lock = threading.Lock()
 _worker_lock = threading.Lock()
+_profile_lock = threading.Lock()
+
+EVENT_PROFILES = risk_engine.load_profiles()
+active_profile_name = "default"
 
 latest_device_count = 0  # Global variable to store device count from C# program
 
@@ -86,29 +97,46 @@ def compute_motion_risk(x, y, z):
     return norm_instability
 
 
-# 🔹 Final risk formula (use inside your /data API)
-def calculate_risk(crowd_count, device_count, norm_instability):
-    risk = (
-        0.5 * (crowd_count / 100) +
-        0.3 * (device_count / 50) +
-        0.2 * norm_instability
+def get_active_profile():
+    """Return (profile_name, profile_dict) in a thread-safe manner."""
+    with _profile_lock:
+        name = active_profile_name
+        profile = EVENT_PROFILES.get(name) or EVENT_PROFILES.get("default", {})
+        return name, profile
+
+
+def set_active_profile(name):
+    """Set active profile by name; raises ValueError if not recognized."""
+    global active_profile_name
+    with _profile_lock:
+        if name not in EVENT_PROFILES:
+            raise ValueError(f"Unknown profile: {name}")
+        active_profile_name = name
+        return name, EVENT_PROFILES[name]
+
+
+def calculate_risk_and_advice(crowd_count, device_count, norm_instability, profile=None):
+    """Calculate risk (0..1), alert level (LOW/MEDIUM/HIGH), and advice text via risk_engine."""
+    if profile is None:
+        _, profile = get_active_profile()
+
+    V = max(0.0, min(1.0, crowd_count / 100.0))
+    W = max(0.0, min(1.0, device_count / 50.0))
+    M = max(0.0, min(1.0, norm_instability))
+
+    R, level = risk_engine.risk(V, W, M, profile)
+    risk_val = round(R / 100.0, 2)
+    alert = LEVEL_TO_ALERT.get(level, "LOW")
+    advice_text = risk_engine.advice(profile, level)
+    return risk_val, alert, advice_text
+
+
+# 🔹 Risk formula delegated to risk_engine for compatibility
+def calculate_risk(crowd_count, device_count, norm_instability, profile=None):
+    risk_val, alert, _ = calculate_risk_and_advice(
+        crowd_count, device_count, norm_instability, profile=profile
     )
-
-    # Optional spike boost (for demo impact with 1 phone)
-    if norm_instability > 0.4:
-        risk += 0.3  # Helps push into MEDIUM
-    if norm_instability > 0.7:
-        risk += 0.6  # Forces directly into HIGH
-
-    # Alert levels
-    if risk > 0.7:
-        alert = "HIGH"
-    elif risk > 0.4:
-        alert = "MEDIUM"
-    else:
-        alert = "LOW"
-
-    return round(min(risk, 1), 2), alert
+    return risk_val, alert
 
 
 def _fetch_camera_counts():
@@ -251,6 +279,41 @@ def update_devices():
         return jsonify({"status": "error", "message": str(e)}), 400
 
 
+@app.route('/set_event', methods=['POST'])
+def set_event():
+    """
+    Endpoint to switch active event profile.
+    Expected JSON: {"profile": "<profile_name>"} or {"event": "<profile_name>"}
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        name = data.get("profile") or data.get("event")
+        if not name:
+            name = request.form.get("profile") or request.form.get("event")
+        if not name and request.data:
+            name = request.get_data(as_text=True).strip()
+
+        if not name:
+            return jsonify({"status": "error", "message": "Missing profile name"}), 400
+
+        if name not in EVENT_PROFILES:
+            return jsonify({
+                "status": "error",
+                "message": f"Unknown profile: {name}",
+                "valid_profiles": list(EVENT_PROFILES.keys())
+            }), 400
+
+        set_active_profile(name)
+        profile = EVENT_PROFILES[name]
+        return jsonify({
+            "status": "ok",
+            "active_profile": name,
+            "label": profile.get("label", name)
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
 @app.route('/data')
 def get_data():
     """
@@ -273,9 +336,13 @@ def get_data():
         mot_updated_at = motion_last_updated
         mot_is_stale = motion_stale
 
+    prof_name, prof_data = get_active_profile()
+
     crowd_density = crowd_count / area if area > 0 else 0
 
-    risk, alert = calculate_risk(crowd_count, device_count, norm_instability)
+    risk, alert, advice_text = calculate_risk_and_advice(
+        crowd_count, device_count, norm_instability, profile=prof_data
+    )
 
     # Scale instability back up to 10 for the UI display
     instability = norm_instability * 10
@@ -288,6 +355,9 @@ def get_data():
         "instability": round(instability, 2),
         "risk": round(risk, 2),
         "alert": alert,
+        "profile": prof_name,
+        "profile_label": prof_data.get("label", prof_name),
+        "advice": advice_text,
         "camera_updated_at": cam_updated_at,
         "camera_stale": cam_is_stale,
         "motion_updated_at": mot_updated_at,

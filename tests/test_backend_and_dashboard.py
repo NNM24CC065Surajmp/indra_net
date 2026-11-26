@@ -35,6 +35,9 @@ def reset_backend_state():
         backend.motion_last_updated = None
         backend.motion_stale = True
 
+    with backend._profile_lock:
+        backend.active_profile_name = "default"
+
     yield
 
     backend.stop_background_workers()
@@ -254,6 +257,8 @@ def test_render_dashboard_displays_non_inverted_stability_and_stale_flag(monkeyp
     rendered_markdown = []
 
     class DummyStreamlit:
+        session_state = {}
+
         def set_page_config(self, **kwargs):
             pass
 
@@ -279,6 +284,9 @@ def test_render_dashboard_displays_non_inverted_stability_and_stale_flag(monkeyp
                 "risk": 0.25,
                 "alert": "LOW",
                 "motion_stale": True,
+                "profile": "default",
+                "profile_label": "Default (current model)",
+                "advice": "Normal monitoring.",
             }
 
     class DummyRequests:
@@ -287,6 +295,9 @@ def test_render_dashboard_displays_non_inverted_stability_and_stale_flag(monkeyp
                 pass
 
         def get(self, url, timeout=5):
+            return DummyResponse()
+
+        def post(self, url, **kwargs):
             return DummyResponse()
 
     monkeypatch.setattr(main, "st", DummyStreamlit())
@@ -301,4 +312,144 @@ def test_render_dashboard_displays_non_inverted_stability_and_stale_flag(monkeyp
     assert "Stability Score (Stale)" in html
     assert "INSTABILITY INDEX" in html
     assert ">3.5<" in html
+    assert "DEFAULT (CURRENT MODEL)" in html
+    assert "Normal monitoring." in html
+
+
+def _legacy_calculate_risk(crowd_count, device_count, norm_instability):
+    """The original hardcoded risk formula from backend.py."""
+    risk = (
+        0.5 * (crowd_count / 100) +
+        0.3 * (device_count / 50) +
+        0.2 * norm_instability
+    )
+
+    if norm_instability > 0.4:
+        risk += 0.3
+    if norm_instability > 0.7:
+        risk += 0.6
+
+    if risk > 0.7:
+        alert = "HIGH"
+    elif risk > 0.4:
+        alert = "MEDIUM"
+    else:
+        alert = "LOW"
+
+    return round(min(risk, 1), 2), alert
+
+
+def test_default_profile_exact_parity_with_legacy_formula():
+    """Verify default profile reproduces legacy formula exactly, including 0.4/0.7 boundaries."""
+    test_cases = [
+        # (crowd_count, device_count, norm_instability)
+        (0, 0, 0.0),
+        (10, 5, 0.1),
+        (50, 25, 0.2),
+        (20, 10, 0.3),
+        # Exact risk boundary 0.4 (0.5 * 0.8 = 0.40, M <= 0.4 -> no boost)
+        (80, 0, 0.0),
+        # Just below risk boundary 0.4 (0.5 * 0.78 = 0.39)
+        (78, 0, 0.0),
+        # Just above risk boundary 0.4 (0.5 * 0.82 = 0.41)
+        (82, 0, 0.0),
+        # Exact motion spike threshold 0.4 (no boost: 0.5*0.4 + 0.3*0.2 + 0.2*0.4 = 0.34)
+        (40, 10, 0.4),
+        # Just above motion spike threshold 0.4 (+0.3 boost)
+        (40, 10, 0.4001),
+        (30, 15, 0.5),
+        # Exact risk boundary 0.7 without spike (0.5*1.0 + 0.3*0.4 + 0.2*0.4 = 0.70)
+        (100, 20, 0.4),
+        # Just below risk boundary 0.7 (0.5*1.0 + 0.3*0.38 + 0.2*0.4 = 0.694)
+        (100, 19, 0.4),
+        # Just above risk boundary 0.7 (0.5*1.0 + 0.3*0.42 + 0.2*0.4 = 0.706)
+        (100, 21, 0.4),
+        # Exact motion spike threshold 0.7 (only +0.3 boost, second +0.6 NOT triggered because not > 0.7)
+        (20, 10, 0.7),
+        # Just above second motion spike threshold 0.7 (+0.3 and +0.6 boosts = +0.9)
+        (20, 10, 0.7001),
+        (10, 5, 0.8),
+        # Full / max values (clamped to 1.0)
+        (100, 50, 1.0),
+        (100, 50, 0.0),
+        (150, 80, 1.0),
+    ]
+
+    for crowd, devices, motion in test_cases:
+        legacy_risk, legacy_alert = _legacy_calculate_risk(crowd, devices, motion)
+        new_risk, new_alert = backend.calculate_risk(crowd, devices, motion)
+
+        assert new_risk == legacy_risk, (
+            f"Risk mismatch for ({crowd}, {devices}, {motion}): "
+            f"new={new_risk} vs legacy={legacy_risk}"
+        )
+        assert new_alert == legacy_alert, (
+            f"Alert mismatch for ({crowd}, {devices}, {motion}): "
+            f"new={new_alert} vs legacy={legacy_alert}"
+        )
+
+
+def test_set_event_endpoint_and_active_profile_advice():
+    client = backend.app.test_client()
+
+    # Default profile check
+    res_default = client.get("/data")
+    assert res_default.status_code == 200
+    p_def = res_default.get_json()
+    assert p_def["profile"] == "default"
+    assert p_def["profile_label"] == "Default (current model)"
+    assert p_def["advice"] == "Normal monitoring."
+
+    # Switch to valid profile
+    set_res = client.post("/set_event", json={"profile": "procession_rally"})
+    assert set_res.status_code == 200
+    assert set_res.get_json()["status"] == "ok"
+    assert set_res.get_json()["active_profile"] == "procession_rally"
+
+    # Verify /data reflects new profile and its advice
+    res_rally = client.get("/data")
+    p_rally = res_rally.get_json()
+    assert p_rally["profile"] == "procession_rally"
+    assert p_rally["profile_label"] == "Procession or rally"
+    assert p_rally["advice"] == "Keep routes clear."
+
+    # Switch to invalid profile -> 400 error
+    bad_res = client.post("/set_event", json={"profile": "nonexistent_profile"})
+    assert bad_res.status_code == 400
+    assert bad_res.get_json()["status"] == "error"
+
+    # Profile remains procession_rally after failed attempt
+    res_still_rally = client.get("/data")
+    assert res_still_rally.get_json()["profile"] == "procession_rally"
+
+
+def test_other_event_profiles_apply_custom_weights_and_thresholds():
+    # Procession rally has heavy motion weight (0.45) and lower thresholds (yellow 35, red 65)
+    rally_profile = backend.EVENT_PROFILES["procession_rally"]
+    assert rally_profile["weights"]["M"] == 0.45
+    assert rally_profile["yellow"] == 35
+    assert rally_profile["red"] == 65
+
+    # Seated audience has higher yellow 45 and red 75
+    seated_profile = backend.EVENT_PROFILES["seated_audience"]
+    assert seated_profile["weights"]["V"] == 0.50
+    assert seated_profile["yellow"] == 45
+    assert seated_profile["red"] == 75
+
+    # Standing gathering
+    standing_profile = backend.EVENT_PROFILES["standing_gathering"]
+    assert standing_profile["weights"]["V"] == 0.45
+
+    # Queue entry
+    queue_profile = backend.EVENT_PROFILES["queue_entry"]
+    assert queue_profile["weights"]["V"] == 0.40
+
+    # Test procession_rally with motion > 0.4 triggers spike rule from JSON
+    # crowd=0, devices=0, motion=0.5 -> base: 0.45*0.5 = 0.225. Spike boost: +0.3 -> 0.525.
+    # 52.5 > yellow (35), so level should be Yellow -> MEDIUM
+    r_val, alert, adv = backend.calculate_risk_and_advice(0, 0, 0.5, profile=rally_profile)
+    assert r_val == 0.53
+    assert alert == "MEDIUM"
+    assert adv == rally_profile["advice"]["Yellow"]
+
 
